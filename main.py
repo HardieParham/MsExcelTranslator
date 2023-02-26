@@ -153,7 +153,7 @@ class Workbook():
 
                 # Update our dictionary, keeping track of the changes made
                 self.ws_titles[old_title] = resulting
-                print(f'Changed WS Title {old_title} to {new_title}')
+                self.log_change(content=f'Changed WS Title {old_title} to {new_title}')
 
             # If no special cases, update the WS title
             else:
@@ -162,7 +162,7 @@ class Workbook():
 
                 # Update our dictionary, keeping track of the changes made
                 self.ws_titles[old_title] = new_title
-                print(f'Changed WS Title {old_title} to {new_title}')
+                self.log_change(content=f'Changed WS Title {old_title} to {new_title}')
 
 
     def loop_thru_worksheet(self, lcol, lrow):
@@ -182,7 +182,7 @@ class Workbook():
                 # If content starts with '=', check to see if worksheet names are in the equation. If yes, use dict translation. if not then pass
                 if text[0] == "=":
                     translated_check = False
-                    print(f"Checking if external sheet reference at {char},{row}")
+                    self.log_change(content=f'Checking if external sheet reference at {char},{row}')
 
                     # Loop through the stored Worksheet translations from before
                     for key, value in self.ws_titles.items():
@@ -190,7 +190,7 @@ class Workbook():
 
                             # Replace found key with already translated WS title
                             translation = text.replace(key, ("'" + value + "'"))
-                            print(f"{char}{row} was changed to {translation}")
+                            self.log_change(content=f'{char}{row} was changed to {translation}')
 
                             # Reset the cell value with new contents
                             self.ws[char + str(row)].value = translation
@@ -198,18 +198,18 @@ class Workbook():
 
                     # If no keys were found in the equation, then pass        
                     if translated_check == False:
-                        print(f'{char}{row}was not translated')
+                        self.log_change(content=f'{char}{row}was not translated')
 
 
                 #If text exists, then translate
                 elif text != "None":
                     translation = self.trans.translate(text)
-                    print(f"{char}{row} - {translation}")
+                    self.log_change(content=f'{char}{row} - {translation}')
                     self.ws[char + str(row)].value = translation
 
                 # If cell is empty, then pass
                 else:
-                    print(f"{char}{row} - None")
+                    self.log_change(content=f'{char}{row} - None')
 
 
     def loop_thru_document(self):
@@ -218,6 +218,7 @@ class Workbook():
 
         # Then translate the content in each Worksheet
         for i, sheet in enumerate(self.wb.worksheets):
+            self.log_change(content=f'Starting to translate: {sheet}')
             print(f'Starting to translate: {sheet}')
 
             # Set the currnet worksheet
@@ -227,7 +228,8 @@ class Workbook():
             (col_value, row_value) = self.get_lastcell()
 
             # Translate the entire sheet
-            self.loop_thru_worksheet(lcol=int(col_value), lrow=int(row_value))        
+            self.loop_thru_worksheet(lcol=int(col_value), lrow=int(row_value)) 
+        self.log_change(content=f'Completed translating {sheet}')      
         print(f'Completed translating {self.name}')
 
 

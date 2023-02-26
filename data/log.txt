@@ -1,2 +1,29 @@
 
  Starting translations for test.xlsx
+ Changed WS Title Hallo to Hello
+ Changed WS Title Guten Tag to Good day
+ Starting to translate: <Worksheet "Hello">
+ A1 - What
+ B1 - None
+ A2 - Is
+ B2 - None
+ A3 - The
+ B3 - None
+ A4 - None
+ B4 - None
+ A5 - None
+ B5 - Really
+ Starting to translate: <Worksheet "Good day">
+ A1 - Probably
+ B1 - None
+ C1 - None
+ A2 - None
+ B2 - None
+ C2 - None
+ A3 - None
+ B3 - None
+ C3 - None
+ A4 - None
+ B4 - None
+ C4 - What is this
+ Completed translating <Worksheet "Good day">
