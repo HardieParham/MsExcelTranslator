@@ -17,9 +17,10 @@ from data.settings import data, char_to_replace
 
 
 
+# Class to handle text and translation functions
 class Text():
     def __init__(self, dest, src):
-        #self.translator = googletrans.Translator()
+        self.trans = googletrans.Translator()
         # Future TODO, setup the ability for text formatting memorization.
         # As of now, any updated text reformats text to document default
         self.alignment = ''
@@ -30,55 +31,19 @@ class Text():
         self.src = src
 
 
-    ### 3 - create translating function
     def translate(self, text):
         try:
+            # There a few characters allowed in excel that break Google Translate's API
+            # So first, need to remove any instances of these, and replace with a space
             for key, value in char_to_replace.items():
                 new_text = text.replace(key, value)
-            translation = googletrans.Translator(new_text, dest=self.dest, src=self.src)
+
+            # Translate new API safe string
+            translation = self.trans.translate(text=new_text, dest=self.dest, src=self.src)
             return translation.text
+        
         except:
             logging.warning(f'Translation failed for {text}')
-
-
-
-
-
-    def text_check(phrase, dic):
-        # If phrase is blank, skip the check
-        if phrase == None or phrase == '':
-            return phrase
-
-        else:
-            # Cycle through all key,value pairs of data
-            for key, value in dic.items():
-
-                # Searching the phrase for the given key, returns the index where the key starts and ends. If no match, start_index is returned as -1
-                start_index = phrase.find(key)
-                end_index = start_index + len(key)
-
-                # If a match was found, update key, value pair
-                if start_index != -1:
-                    print(f'MATCH! Changing {key} to {value}')
-
-                    # If the match is at the start of the textline
-                    if start_index == 0:
-                        splits = phrase.split(key)
-                        phrase = value + splits[1]
-
-                    # If the match is at the end of the textline
-                    elif end_index == len(phrase):
-                        splits = phrase.split(key)
-                        phrase = splits[0] + value
-
-                    # If the match is somewhere in the middle
-                    else:
-                        splits = phrase.split(key)
-                        phrase = splits[0] + value + splits[1]
-                    
-            # Returns back new updated phrase
-            return phrase
-
 
 
 
@@ -87,9 +52,10 @@ class Workbook():
     def __init__(self, file):
         self.name = file
         self.new_name = 'ENG_' + file
-        #self.new_name = Text.translate(text=self.old_name, )
+        self.data = data
         self.wb = self.load_wb()
         self.ws_titles = {}
+        self.trans = Text(dest=self.data['destination language'], src=self.data['source language'])
 
 
     # Method to load the excel document to extract its information
@@ -101,8 +67,7 @@ class Workbook():
 
     # Method to save word document after changes have been made
     def save_wb(self):
-        # Hardie.wb.save(file_name)
-        self.wb.save(f'output/{self.name}')
+        self.wb.save(f'output/{self.new_name}')
 
 
     # Method to update log.txt if any changes were made (useful if errors after script was run)
@@ -111,37 +76,159 @@ class Workbook():
             f.write(f'\n {content}')
 
 
+    # Method to find the last cell (Row and column) that a value occurs
+    # NOTE: This is just the last column and last row that conatin a value. A value may not necessarily be at the row-column combination specified.
+    # e.g. Last item by column is in Z1, last item by row is in B 15, This function would return Z-15, even though there is not a value in that cell.
+    def get_lastcell(self):
+            
+            # Finds Last Entry in the last Column
+            cols = (tuple(self.ws.columns))
+            try:
+                # Last entry of the last column of the sheet
+                last = str(cols[-1][-1])
+
+                # Seperates the last cell's Letter Column and Number Row
+                # NOTE Cell starts with a '.', avoid '.' in the WS title 
+                try:
+                    split = last.split("'.")
+                except:
+                    print("WorkSheet Name Error! Change worksheet name to avoid the following character combination '.")
+                
+                # setting Last Cell position variable    
+                position = split[1]
+                row=""
+                col=""
+
+                # Seperates the Letter and Number, then assigns them to Col and Row variables respectively
+                for item in position:
+                    if item in ("A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"):
+                        col += item
+                    elif item == ">":
+                        pass
+                    else:
+                        row += item
+
+                #Converts Column string into integer
+                input = col.lower()
+                output = []
+                for character in input:
+                    number = ord(character) - 96
+                    output.append(number)
+
+                # If Column has more than 1 letter, convert to correct integer
+                if len(output) > 1:
+                    col_value = ((len(output) - 1) * 26) + output[-1]
+                else:
+                    col_value = output[0]
+
+                #Return integers for Col and Row
+                return col_value, row
+            # If no cells were found, sheet is empty. Return zero coordinates.
+            except:
+                return 0, 0
+
+
+    # Method to translate worksheet titles (the tabs at the bottom of excel)
     def translate_ws_titles(self):
+
+        # Loop thru each sheet
         for i, sheet in enumerate(self.wb.worksheets):
-            print(f"{i}, {sheet.title}")
+            
+            # Register the current title
             old_title = sheet.title
-            print(old_title)
-            translator = Text(dest='en', src='de')
-            new_title = translator.translate(text=sheet.title)
-            print(new_title)
+
+            # Translate title
+            new_title = self.trans.translate(sheet.title)
+            
+            # If translation failed, reset title to old_title
             if new_title == None:
                 new_title = old_title
+
+            # The character '/' in a WS title crashes excel, so need to remove it    
             if "/" in new_title:
                 resulting = re.sub("/", " ", new_title)
+
+                # Update the WS title
                 self.wb.worksheets[i].title = resulting
-                self.titles[old_title] = resulting
 
+                # Update our dictionary, keeping track of the changes made
+                self.ws_titles[old_title] = resulting
+                print(f'Changed WS Title {old_title} to {new_title}')
+
+            # If no special cases, update the WS title
             else:
+                # Update the WS title
                 self.wb.worksheets[i].title = new_title
+
+                # Update our dictionary, keeping track of the changes made
                 self.ws_titles[old_title] = new_title
-        print(self.ws_titles)
+                print(f'Changed WS Title {old_title} to {new_title}')
 
 
-    def loop_thru_worksheet(self, sheet):
-        pass
+    def loop_thru_worksheet(self, lcol, lrow):
+        #Loop through the rows of the worksheet
+        for row in range(1,(lrow+1)):
+
+            #Nested loop through the columns of the worksheet first
+            for col in range(1,(lcol+1)):
+
+                #Get Column text character (e.g column 'AB' = 28)
+                char = get_column_letter(col)
+
+                #Extracts the contents of the cell
+                text = str(self.ws[char + str(row)].value)
+
+
+                # If content starts with '=', check to see if worksheet names are in the equation. If yes, use dict translation. if not then pass
+                if text[0] == "=":
+                    translated_check = False
+                    print(f"Checking if external sheet reference at {char},{row}")
+
+                    # Loop through the stored Worksheet translations from before
+                    for key, value in self.ws_titles.items():
+                        if key in text:
+
+                            # Replace found key with already translated WS title
+                            translation = text.replace(key, ("'" + value + "'"))
+                            print(f"{char}{row} was changed to {translation}")
+
+                            # Reset the cell value with new contents
+                            self.ws[char + str(row)].value = translation
+                            translated_check = True
+
+                    # If no keys were found in the equation, then pass        
+                    if translated_check == False:
+                        print(f'{char}{row}was not translated')
+
+
+                #If text exists, then translate
+                elif text != "None":
+                    translation = self.trans.translate(text)
+                    print(f"{char}{row} - {translation}")
+                    self.ws[char + str(row)].value = translation
+
+                # If cell is empty, then pass
+                else:
+                    print(f"{char}{row} - None")
 
 
     def loop_thru_document(self):
+        # Translate all Worksheet titles first
         self.translate_ws_titles()
-        for sheet in self.wb.worksheets:
-            self.loop_thru_worksheet(sheet)
 
+        # Then translate the content in each Worksheet
+        for i, sheet in enumerate(self.wb.worksheets):
+            print(f'Starting to translate: {sheet}')
 
+            # Set the currnet worksheet
+            self.ws = self.wb.worksheets[i]
+
+            # find the location of the last cell in the worksheet
+            (col_value, row_value) = self.get_lastcell()
+
+            # Translate the entire sheet
+            self.loop_thru_worksheet(lcol=int(col_value), lrow=int(row_value))        
+        print(f'Completed translating {self.name}')
 
 
 
@@ -150,8 +237,6 @@ class App():
     def __init__(self):
         self.input_path = './input'
         self.filename_list = self.get_files()
-        self.dest = data['destination language']
-        self.src = data['source language']
 
 
     # Finds and registers all files in the input folder
@@ -207,27 +292,3 @@ class App():
 if __name__ == "__main__":
     app = App()
     app.main_loop()
-    #trans = googletrans.Translator()
-    #first = 'Was ist passiert?'
-    #second = trans.translate(text=first, dest='en', src='de')
-    #print(second.text)
-
-
-
-# Process
-# 1 - Imports
-# 2 - Save new file
-# 3 - create translating function
-# 4 - keep dict of worksheet names
-# 5 - translate worksheet names
-# 6 - update dict with translations
-# 7 - function to find last cell in worksheet
-# 8 - translation loop through worksheet
-# 9 - in text = none then pass
-# 10 - if text, then translate
-# 11 - if starts with =, check to see if worksheet names are in it. If yes, use dict translationj. if not then pass
-# 12 - go to next worksheet
-# 13 - repeat finding cell and translate
-# 14 - save file again
-# 15 - set settings (langauge in, languiage out)
-# 16 - Start Loop
