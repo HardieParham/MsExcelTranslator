@@ -21,12 +21,6 @@ from data.settings import data, char_to_replace
 class Text():
     def __init__(self, dest, src):
         self.trans = googletrans.Translator()
-        # Future TODO, setup the ability for text formatting memorization.
-        # As of now, any updated text reformats text to document default
-        self.alignment = ''
-        self.font = ''
-        self.font_size = ''
-        self.content = ''
         self.dest = dest
         self.src = src
 
